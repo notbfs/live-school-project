@@ -6,12 +6,10 @@ from io import BytesIO
 import pyarrow.parquet as pq
 from multiprocessing import Pool, cpu_count
 
-# ---------------- Настройки ----------------
-LOCAL_PARQUET_DIR = r"C:\Users\andre\.cache\huggingface\hub\datasets--cj-mills--hagrid-classification-512p-no-gesture-150k\snapshots\70afa88ad4d25ce1402e76b6f6b10c00eb44e7fa\data"  # путь к parquet
+LOCAL_PARQUET_DIR = r"C:\Users\andre\.cache\huggingface\hub\datasets--cj-mills--hagrid-classification-512p-no-gesture-150k\snapshots\70afa88ad4d25ce1402e76b6f6b10c00eb44e7fa\data"
 TARGET_DIR = "dataset"
 TRAIN_RATIO = 0.9
-JPEG_QUALITY = 85  # сохраняем в JPEG для ускорения и экономии места
-# ------------------------------------------
+JPEG_QUALITY = 85
 
 def prepare_folder_structure(classes):
     for split in ["train", "val"]:
@@ -51,7 +49,6 @@ def save_images_from_parquet(parquet_file, split_ratio=TRAIN_RATIO):
             split = "train" if i < split_idx else "val"
             tasks.append((img, cls, i, split))
 
-    # --- Многопроцессорная запись ---
     with Pool(cpu_count()) as p:
         p.map(save_single_image, tasks)
 

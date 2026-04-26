@@ -9,7 +9,7 @@ from PIL import Image
 
 
 MODEL_PATH = "hand_gesture_model.pth"
-DATASET_DIR = "dataset"
+REALTEST_DIR = "realtest"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -21,6 +21,13 @@ transform = transforms.Compose([
         std=[0.229, 0.224, 0.225],
     ),
 ])
+
+
+def is_label_match(filename: str, label: str):
+    name_without_ext = os.path.splitext(filename)[0].lower()
+    normalized_label = str(label).lower().replace("-", "_").replace(" ", "_")
+    tokens = name_without_ext.replace("-", "_").replace(" ", "_").split("_")
+    return normalized_label in tokens or name_without_ext.startswith(f"{normalized_label}_")
 
 
 def load_model():
@@ -42,13 +49,22 @@ def load_model():
 
 def get_random_example_path(label: str):
     candidates = []
-    for split in ("train", "val"):
-        class_dir = os.path.join(DATASET_DIR, split, str(label))
-        if not os.path.isdir(class_dir):
+    label_dirs = [
+        os.path.join(REALTEST_DIR, str(label)),
+        os.path.join(REALTEST_DIR, "train", str(label)),
+        os.path.join(REALTEST_DIR, "val", str(label)),
+    ]
+    for directory in label_dirs:
+        if not os.path.isdir(directory):
             continue
-        for f in os.listdir(class_dir):
+        for f in os.listdir(directory):
             if f.lower().endswith((".jpg", ".jpeg", ".png")):
-                candidates.append(os.path.join(class_dir, f))
+                candidates.append(os.path.join(directory, f))
+
+    if not candidates and os.path.isdir(REALTEST_DIR):
+        for f in os.listdir(REALTEST_DIR):
+            if f.lower().endswith((".jpg", ".jpeg", ".png")) and is_label_match(f, label):
+                candidates.append(os.path.join(REALTEST_DIR, f))
 
     if not candidates:
         return None
@@ -75,7 +91,6 @@ def main():
             if not ret:
                 break
 
-            # Подготовка кадра для модели
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pil_img = Image.fromarray(frame_rgb)
             input_tensor = transform(pil_img).unsqueeze(0).to(DEVICE)
@@ -87,7 +102,6 @@ def main():
             label = idx_to_class[pred.item()]
             confidence = conf.item()
 
-            # Рисуем результат на кадре
             text = f"{label} ({confidence:.2%})"
             cv2.rectangle(frame, (10, 10), (10 + 320, 50), (0, 0, 0), -1)
             cv2.putText(
@@ -101,7 +115,6 @@ def main():
                 cv2.LINE_AA,
             )
 
-            # Показать пример этого жеста в правом верхнем углу
             if label != last_example_label or last_example_img is None:
                 example_path = get_random_example_path(label)
                 if example_path is not None:
@@ -109,9 +122,11 @@ def main():
                     if img is not None:
                         last_example_img = img
                         last_example_label = label
+                else:
+                    last_example_img = None
+                    last_example_label = label
 
             if last_example_img is not None:
-                # Масштабируем пример и вписываем в правый верхний угол
                 h, w = frame.shape[:2]
                 ex_h, ex_w = 160, 160
                 example_resized = cv2.resize(last_example_img, (ex_w, ex_h))

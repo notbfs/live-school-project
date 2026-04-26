@@ -11,8 +11,8 @@ from tkinter import messagebox
 from tkinter import ttk
 
 
-MODEL_PATH = "hand_gesture_model.pth"  # путь к вашему обученному жестовому чекпоинту
-DATASET_DIR = "dataset"               # корень датасета с подпапками классов
+MODEL_PATH = "hand_gesture_model.pth"
+REALTEST_DIR = "realtest"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -24,6 +24,13 @@ transform = transforms.Compose([
         std=[0.229, 0.224, 0.225],
     ),
 ])
+
+
+def is_label_match(filename: str, label: str):
+    name_without_ext = os.path.splitext(filename)[0].lower()
+    normalized_label = str(label).lower().replace("-", "_").replace(" ", "_")
+    tokens = name_without_ext.replace("-", "_").replace(" ", "_").split("_")
+    return normalized_label in tokens or name_without_ext.startswith(f"{normalized_label}_")
 
 
 def load_model():
@@ -58,7 +65,6 @@ class GestureApp:
         style.configure("TButton", font=("Segoe UI", 11), padding=8)
         style.configure("TFrame", background="#1e1e1e")
 
-        # Основной фрейм (лево: камера, право: результат и пример)
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
@@ -68,20 +74,17 @@ class GestureApp:
         right_frame = ttk.Frame(main_frame)
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(15, 0))
 
-        # Модель
         try:
             self.model, self.idx_to_class = load_model()
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось загрузить модель:\n{e}")
             raise
 
-        # Камера
         self.cap = cv2.VideoCapture(0)
         if not self.cap.isOpened():
             messagebox.showerror("Ошибка", "Не удалось открыть камеру")
             raise RuntimeError("Camera not available")
 
-        # UI: видео с камеры
         title_label = tk.Label(
             left_frame,
             text="Живое видео с камеры",
@@ -104,7 +107,6 @@ class GestureApp:
         )
         self.capture_button.pack(side=tk.LEFT)
 
-        # Правая колонка: результат + пример
         result_title = tk.Label(
             right_frame,
             text="Результат распознавания",
@@ -126,7 +128,7 @@ class GestureApp:
 
         example_title = tk.Label(
             right_frame,
-            text="Пример этого жеста из датасета",
+            text="Пример этого жеста",
             font=("Segoe UI", 12, "bold"),
             fg="#ffffff",
             bg="#1e1e1e",
@@ -149,11 +151,9 @@ class GestureApp:
         if ret:
             self.current_frame = frame.copy()
 
-            # OpenCV: BGR → RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img = Image.fromarray(frame_rgb)
 
-            # Маштабируем под доступное пространство слева
             img = img.resize((640, 480))
 
             img_tk = ImageTk.PhotoImage(image=img)
@@ -183,35 +183,41 @@ class GestureApp:
 
             self.result_var.set(f"Результат: {label} ({confidence:.2%})")
 
-            # Показать пример из датасета с тем же типом
             self.show_example_image(label)
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось выполнить распознавание:\n{e}")
 
     def show_example_image(self, label):
-        # label — это имя класса (папка), как сохранено в чекпоинте
         candidates = []
-        for split in ("train", "val"):
-            class_dir = os.path.join(DATASET_DIR, split, str(label))
-            if not os.path.isdir(class_dir):
+        label_dirs = [
+            os.path.join(REALTEST_DIR, str(label)),
+            os.path.join(REALTEST_DIR, "train", str(label)),
+            os.path.join(REALTEST_DIR, "val", str(label)),
+        ]
+        for directory in label_dirs:
+            if not os.path.isdir(directory):
                 continue
-            for f in os.listdir(class_dir):
+            for f in os.listdir(directory):
                 if f.lower().endswith((".jpg", ".jpeg", ".png")):
-                    candidates.append(os.path.join(class_dir, f))
+                    candidates.append(os.path.join(directory, f))
+
+        if not candidates and os.path.isdir(REALTEST_DIR):
+            for f in os.listdir(REALTEST_DIR):
+                if f.lower().endswith((".jpg", ".jpeg", ".png")) and is_label_match(f, label):
+                    candidates.append(os.path.join(REALTEST_DIR, f))
 
         if not candidates:
-            # Нечего показать — просто выходим
+            self.example_label.configure(image="")
+            self.example_img_tk = None
             return
 
         example_path = random.choice(candidates)
         try:
             img = Image.open(example_path).convert("RGB")
-            # Подогнать под правую панель
             img = img.resize((320, 320))
             self.example_img_tk = ImageTk.PhotoImage(image=img)
             self.example_label.configure(image=self.example_img_tk)
         except Exception as e:
-            # Не показываем алерт, чтобы не раздражать пользователя, просто игнорируем
             print(f"Не удалось загрузить пример изображения: {e}")
 
     def on_close(self):

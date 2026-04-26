@@ -44,7 +44,6 @@ def main():
         print(f"Epoch {epoch+1}/{EPOCHS} | "
               f"Train Loss: {loss_sum:.4f} | Train Acc: {train_acc:.4f}")
 
-    # ✅ СОХРАНЕНИЕ ЧЕКПОИНТА
     torch.save({
         "model_state_dict": model.state_dict(),
         "class_to_idx": class_to_idx

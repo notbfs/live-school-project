@@ -18,7 +18,10 @@ transform = transforms.Compose([
 ])
 
 def main():
-    # 🔹 загрузка чекпоинта
+    if not os.path.isdir(IMAGE_DIR):
+        print(f"Папка не найдена: {IMAGE_DIR}")
+        return
+
     checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
 
     class_to_idx = checkpoint["class_to_idx"]
