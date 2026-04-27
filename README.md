@@ -38,7 +38,7 @@
 ### 1) Клонирование проекта
 
 ```bash
-git clone <URL_ВАШЕГО_РЕПОЗИТОРИЯ>
+git clone <github.com/notbfs/live-school-project>
 cd live-school-project
 ```
 
