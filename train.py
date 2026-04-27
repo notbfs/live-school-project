@@ -7,7 +7,7 @@ from dataset import get_dataloaders
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 EPOCHS = 4
 LR = 1e-4
-MODEL_PATH = "model.pth"
+MODEL_PATH = "hand_gesture_model.pth"
 
 def main():
     train_loader, val_loader, class_to_idx = get_dataloaders()
@@ -49,7 +49,7 @@ def main():
         "class_to_idx": class_to_idx
     }, MODEL_PATH)
 
-    print("✅ Модель сохранена в model.pth")
+    print("✅ Модель сохранена в hand_gesture_model.pth")
 
 if __name__ == "__main__":
     main()
